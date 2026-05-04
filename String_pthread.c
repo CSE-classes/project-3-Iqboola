@@ -1,4 +1,3 @@
-
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,7 +22,7 @@ int main(int argc, char *argv[])
 	pthread_mutex_init(&total_lock,NULL);
 	readf(fp);
 	for(i=0;i<NUM_THREADS;i++){
-		rc=pthread_create(&threads[i],NULL,sub_string,(void *)i);
+		rc=pthread_create(&threads[i],NULL,sub_string,(void *)(long)i);
 		if (rc){
 			printf("ERROR: return error from pthread_create() is %d\n", rc);
 			exit(-1);
@@ -72,12 +71,32 @@ int readf(FILE *fp)
 void *sub_string(void *threadid) 	/*each process searches in the string with the step of nprocs until it reach or beyond*/ 
 	/*the (n1-n2)th char which is the last possible beginning of the substring*/
 {
+	long tid = (long)threadid;
+    int start = tid * nlocal;
+    int end = (tid == NUM_THREADS - 1) ? (n1 - n2 + 1) : (start + nlocal);
+    int local_count = 0;
+    int i, j, k;
 
+    // Search within the assigned segment
+    // Don't go past n1 - n2 to avoid out of bounds
+    for (i = start; i < end && i <= (n1 - n2); i++) {
+        int match_count = 0;
+        for (j = i, k = 0; k < n2; j++, k++) {
+            if (*(s1 + j) != *(s2 + k)) {
+                break;
+            } else {
+                match_count++;
+            }
+        }
+        if (match_count == n2) {
+            local_count++;
+        }
+    }
+
+    // Protect global total variable with mutex
+    pthread_mutex_lock(&total_lock);
+    total += local_count;
+    pthread_mutex_unlock(&total_lock);
+
+    pthread_exit(NULL);
 }
-
-
-
-
-
-
-
